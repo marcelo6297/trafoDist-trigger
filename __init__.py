@@ -46,31 +46,33 @@ def main(event: func.EventHubEvent):
     # Luego aplicar el 80% para la alerta a la nueva potencia nominal
 
     logging.info(f'Temperatura: {temp} Volts {vfr} Corriente: {cfr}')
-
-    if (( vfr > umbral_vac_max) or (vfr < umbral_vac_min )):
+    # Leemos la información para encender el LED de alarma en cada una de las fases
+    if (( vfr > umbral_vac_max) or (vfr < umbral_vac_min ) or ( vfs > umbral_vac_max) or (vfs < umbral_vac_min ) or ( vft > umbral_vac_max) or (vft < umbral_vac_min )):
         vac_on = True
     else:
+    # Todas las fases estan dentro de los limites, apagamos el led    
         vac_on = False
+    
+    temp_on = temp > umbral_temp_max
 
-    if ( temp > umbral_temp_max):
-        temp_on = True
-    else:
-        temp_on = False
     #Preguntar si se necesita corregir la corriente maxima
     if (temp > temp_correccion):
        umbral_amp_max = 0.8 * potencia_trafo * (110 - temp) / (220 * 1.732 * 80)
     else:   
        umbral_amp_max = 0.8 * potencia_trafo / (220 * 1.732)
 
-    if ( cfr > umbral_amp_max):
+    # Preguntar si una corriente supera el umbral maximo, activar el LED de alarma
+    if ( (cfr > umbral_amp_max) or (cfs > umbral_amp_max) or (cft > umbral_amp_max)):
         amp_on = True
     else:
+    # Todas las corrientes dentro de los limites, apagamos el led    
         amp_on = False
     
-
+    # Generamos el mensaje C2D
     direct_method = CloudToDeviceMethod(method_name='anomalia_detectada', payload=  {"vac_on": vac_on, "amp_on": amp_on , "temp_on": temp_on})
         
-
+    # Buscamos el connection_string
     registry_manager_connection_string = os.environ['REGISTRY_MANAGER_CONNECTION_STRING']
     registry_manager = IoTHubRegistryManager(registry_manager_connection_string)    
+    # Invocamos el metodo
     registry_manager.invoke_device_method(device_id, direct_method)
